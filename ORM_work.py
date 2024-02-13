@@ -20,6 +20,7 @@ create_tables(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
 
+# ВЫгрузка данных из "fixtures.json"
 with open("fixtures.json") as f:
     json_reader = json.load(f)
 
@@ -34,20 +35,24 @@ for record in json_reader:
     session.add(model(id=record.get('pk'), **record.get('fields'))) # нужно пояснение по двум звездочкам, что это значит? (**)
 session.commit()
 
-# По имени издателя выдать построчно факты покупки книг этого издателя:
-# название книги | название магазина, в котором была куплена эта книга | стоимость покупки | дата покупки
+# Поиск по имени или id издателя(input)
+def get_shops(search_word):
+    result = session.query(
+        Book.title, Shop.name, Sale.price, Sale.date_sale
+    ).select_from(Shop) \
+        .join(Stock, Stock.id_shop == Shop.id) \
+        .join(Book, Book.id == Stock.id_book) \
+        .join(Publisher, Publisher.id == Book.id_publisher) \
+        .join(Sale, Sale.id_stock == Stock.id)
+    if search_word.isdigit():
+        f_result = result.filter(Publisher.id == search_word).all()
+    else:
+        f_result = result.filter(Publisher.name == search_word).all()
+    for book_name, shop_name, sale_cost, sale_date in f_result:
+        print(f"{book_name: <40} | {shop_name: <10} | {sale_cost: <8} | {sale_date.strftime('%d-%m-%Y')}")
 
-pub_name = "O’Reilly"
-
-result = session.query(Book.title, Shop.name, Sale.price, Sale.date_sale) \
-    .join(Publisher, Publisher.id == Book.id_publisher) \
-    .join(Stock, Stock.id_book == Book.id) \
-    .join(Shop, Shop.id == Stock.id_shop)  \
-    .join(Sale, Sale.id_stock == Stock.id) \
-    .filter(Publisher.name == pub_name)
-
-for row in result:
-    print(f'{row[0]:<39} | {row[1]:<8} | {row[2]:<5} | {(row[3]).date()}')
-
+if __name__ == '__main__':
+    search_word = input("Введите имя или айди публициста: ")
+    get_shops(search_word)
 
 session.close()
